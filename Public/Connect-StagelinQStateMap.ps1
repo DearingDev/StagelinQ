@@ -25,7 +25,13 @@ function Connect-StagelinQStateMap {
     $parsedIp = [System.Net.IPAddress]::Parse($deviceIp)
     if ($parsedIp.IsIPv4MappedToIPv6) { $parsedIp = $parsedIp.MapToIPv4() }
 
-    $tcp    = [System.Net.Sockets.TcpClient]::new()
+    $localBindAddr = Get-LocalSubnetAddress -RemoteAddress $parsedIp.ToString()
+    if ($localBindAddr) {
+        $tcp = [System.Net.Sockets.TcpClient]::new(
+            [System.Net.IPEndPoint]::new($localBindAddr, 0))
+    } else {
+        $tcp = [System.Net.Sockets.TcpClient]::new()
+    }
     $tcp.Connect($parsedIp, $stateMapPort)
     $stream = $tcp.GetStream()
     $stream.ReadTimeout = 30000
