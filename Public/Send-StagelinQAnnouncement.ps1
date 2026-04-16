@@ -49,8 +49,26 @@ function Send-StagelinQAnnouncement {
     $frame = Build-DiscoveryFrame -Token ([byte[]]$Token) -Source $Source -Action 'DISCOVERER_HOWDY_' `
         -SoftwareName $SoftwareName -Version $Version -Port $Port
 
-    $broadcast = [System.Net.IPEndPoint]::new([System.Net.IPAddress]::Broadcast, 51337)
-    [void]$Socket.Send($frame, $frame.Length, $broadcast)
+    # Send to each active interface's subnet broadcast so devices on non-default subnets
+    # (e.g. a DJ controller on en0/192.168.8.x when the default route is via en8/10.x.x.x)
+    # still receive our announcement. 255.255.255.255 only goes out on the default interface.
+    $sentAddrs = [System.Collections.Generic.HashSet[string]]::new()
+    foreach ($ni in [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces()) {
+        if ($ni.OperationalStatus -ne 'Up') { continue }
+        foreach ($ua in $ni.GetIPProperties().UnicastAddresses) {
+            if ($ua.Address.AddressFamily -ne [System.Net.Sockets.AddressFamily]::InterNetwork) { continue }
+            if ($ua.Address.Equals([System.Net.IPAddress]::Loopback)) { continue }
+            $ipBytes   = $ua.Address.GetAddressBytes()
+            $maskBytes = $ua.IPv4Mask.GetAddressBytes()
+            $bcast     = [byte[]]::new(4)
+            for ($i = 0; $i -lt 4; $i++) { $bcast[$i] = $ipBytes[$i] -bor (-bnot $maskBytes[$i] -band 0xFF) }
+            $bcastStr = ([System.Net.IPAddress]::new($bcast)).ToString()
+            if ($sentAddrs.Add($bcastStr)) {
+                $ep = [System.Net.IPEndPoint]::new([System.Net.IPAddress]::new($bcast), 51337)
+                try { [void]$Socket.Send($frame, $frame.Length, $ep) } catch {}
+            }
+        }
+    }
 
     # macOS does not loop limited broadcast back to local sockets; also send to loopback
     # so that local listeners (including Find-StagelinQDevice) see the frame
