@@ -41,8 +41,8 @@ function Start-StagelinQStreams {
             '/Engine/Deck1/PlayState',
             '/Engine/Deck2/PlayState',
             '/Engine/Master/Crossfader/Position',
-            '/Engine/Deck1/Loop/Active',
-            '/Engine/Deck2/Loop/Active'
+            '/Engine/Deck1/Track/LoopEnableState',
+            '/Engine/Deck2/Track/LoopEnableState'
         )
     )
 
