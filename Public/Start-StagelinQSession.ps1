@@ -72,13 +72,12 @@ function Start-StagelinQSession {
     $dashboardBytes = $null
     if (Test-Path $DashboardHtmlPath) {
         $html = [System.IO.File]::ReadAllText($DashboardHtmlPath)
-        # Patch the BASE URL to match the actual port we're using.
-        # We use a script snippet that prefers the current window's origin if it matches the port,
-        # otherwise falls back to the explicit localhost URL. This fixes issues when accessing by IP.
-        $patch = "const BASE = window.location.port == '$Port' ? window.location.origin : 'http://localhost:$Port';"
-        $html = $html -replace "const\s+BASE\s+=\s+'http://localhost:\d+';", $patch
+        # The dashboard derives BASE dynamically from window.location.port.
+        # No compile-time patching needed — the port is always taken from the
+        # actual URL the browser used to open the dashboard, which is correct
+        # for both localhost and remote-IP access scenarios.
         $dashboardBytes = [System.Text.Encoding]::UTF8.GetBytes($html)
-        & $writeStep "Dashboard HTML loaded and patched for port $Port ($($dashboardBytes.Length) bytes)"
+        & $writeStep "Dashboard HTML loaded for port $Port ($($dashboardBytes.Length) bytes)"
     } else {
         Write-Warning "dashboard.html not found at '$DashboardHtmlPath' — /dashboard endpoint will return 404"
     }
@@ -233,7 +232,7 @@ function Start-StagelinQSession {
         Write-Host ''
         Write-Host '  Session ready.' -ForegroundColor Green
         Write-Host "  Dashboard : $($session.DashboardUrl)" -ForegroundColor Cyan
-        Write-Host "  API state : http://localhost:$Port/state" -ForegroundColor Cyan
+        Write-Host "  API state : $($api.BaseUrl)/state" -ForegroundColor Cyan
         Write-Host "  Stop with : Stop-StagelinQSession -Session `$session" -ForegroundColor DarkGray
         Write-Host ''
     }

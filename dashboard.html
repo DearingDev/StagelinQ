@@ -301,6 +301,24 @@
       margin-top: 10px;
     }
 
+    /* ── Error Detail ─────────────────────────────────────────────────── */
+    .error-detail {
+      display: none;
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      color: #ff6655;
+      background: rgba(255, 50, 30, 0.08);
+      border: 1px solid rgba(255, 50, 30, 0.25);
+      border-radius: 8px;
+      padding: 8px 16px;
+      max-width: 1000px;
+      width: 100%;
+      word-break: break-all;
+      text-align: center;
+    }
+    .error-detail.visible { display: block; }
+
     /* ── Debug Panel ──────────────────────────────────────────────────── */
     .debug-toggle {
       font-size: 0.65rem;
@@ -434,14 +452,24 @@
   </div>
 
   <footer id="pollFooter">...</footer>
+  <div class="error-detail" id="errorDetail"></div>
   <span class="state-count" id="stateCount"></span>
   <div class="debug-toggle" id="debugToggle" title="Show raw state keys">⚙ Debug</div>
   <div class="debug-panel" id="debugPanel"></div>
 
   <script>
     // ── config ────────────────────────────────────────────────────────────────
-    const BASE     = `${window.location.protocol}//${window.location.host}`;
-    const POLL_MS  = 250;
+    // Use 127.0.0.1 instead of 'localhost' to avoid dual-stack issues on Windows
+    // where 'localhost' may resolve to ::1 (IPv6) while the API is only bound to
+    // 127.0.0.1 (IPv4), causing silent "Failed to fetch" errors.
+    // If the dashboard is accessed from a remote machine (different host) we fall
+    // back to the actual hostname so the API URL stays reachable.
+    const _loc   = window.location;
+    const _host  = (_loc.hostname === 'localhost' || _loc.hostname === '127.0.0.1')
+                     ? '127.0.0.1'
+                     : _loc.hostname;
+    const BASE   = `${_loc.protocol}//${_host}:${_loc.port}`;
+    const POLL_MS = 250;
 
     // Update footer with current config
     (function initFooter() {
@@ -659,7 +687,10 @@
     }
 
     // ── poll ──────────────────────────────────────────────────────────────────
+    let _consecutiveErrors = 0;
+
     async function poll() {
+      const errEl = document.getElementById('errorDetail');
       try {
         const [hRes, sRes] = await Promise.all([
           fetch(`${BASE}/health`),
@@ -669,6 +700,9 @@
         if (!hRes.ok) throw new Error(`HTTP ${hRes.status}`);
         const health = await hRes.json();
         setHealth(true, 'CONNECTED', health.uptime);
+        _consecutiveErrors = 0;
+        errEl.classList.remove('visible');
+        errEl.textContent = '';
 
         if (sRes.ok) {
           const state = await sRes.json();
@@ -678,7 +712,15 @@
           updateDebugPanel(state);
         }
       } catch (err) {
-        setHealth(false, err.message || 'UNREACHABLE', null);
+        const msg = err.message || 'UNREACHABLE';
+        setHealth(false, msg, null);
+        _consecutiveErrors++;
+        // Show the detail strip after a couple of failures so transient errors
+        // don't flash the error message on every glitch.
+        if (_consecutiveErrors >= 3) {
+          errEl.textContent = `API unreachable: ${BASE} — ${msg}`;
+          errEl.classList.add('visible');
+        }
       }
     }
 

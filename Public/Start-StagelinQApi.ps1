@@ -22,13 +22,19 @@ function Start-StagelinQApi {
         TCP port to listen on. Default: 8080.
     .PARAMETER Prefix
         Full HttpListener prefix (e.g. 'http://+:8080/'). Defaults to
-        "http://localhost:<Port>/". Override when binding to all interfaces or using HTTPS.
+        "http://localhost:<Port>/" which works on Windows without elevation.
+        Use 'http://*:<Port>/' or 'http://+:<Port>/' to bind to all interfaces
+        (requires admin or a netsh urlacl entry on Windows).
     .OUTPUTS
-        A PSCustomObject with Listener, Ps, Runspace, Handle, StartTime, Port, and Prefix
-        properties. Pass this object to Stop-StagelinQApi.
+        A PSCustomObject with Listener, Ps, Runspace, Handle, StartTime, Port, Prefix,
+        and BaseUrl properties. Pass this object to Stop-StagelinQApi.
     .EXAMPLE
         $api = Start-StagelinQApi -Port 8080
         Invoke-RestMethod http://localhost:8080/health
+        Stop-StagelinQApi -Api $api
+    .EXAMPLE
+        # Bind to all interfaces (requires admin on Windows)
+        $api = Start-StagelinQApi -Port 8080 -Prefix 'http://*:8080/'
         Stop-StagelinQApi -Api $api
     .EXAMPLE
         # Seed state manually for offline testing
@@ -43,8 +49,12 @@ function Start-StagelinQApi {
         [byte[]] $DashboardBytes = $null
     )
 
+    # Default to localhost-only binding — works on Windows without elevation.
+    # Wildcard bindings (http://*:Port/ or http://+:Port/) require either admin
+    # privileges or a 'netsh http add urlacl' entry on Windows.
+    $explicitPrefix = [bool]$Prefix
     if (-not $Prefix) {
-        $Prefix = "http://*:$Port/"
+        $Prefix = "http://localhost:$Port/"
     }
 
     $listener = [System.Net.HttpListener]::new()
@@ -56,7 +66,18 @@ function Start-StagelinQApi {
         if ($msg -match 'already in use') {
             throw "TCP Port $Port is already in use by another process. Use -Port to choose a different port, or ensure the previous session is stopped with Stop-StagelinQSession."
         }
-        throw $_
+        # On Windows, wildcard/+ prefixes fail without elevation or a URL ACL.
+        # If the caller did not specify -Prefix explicitly, retry with localhost.
+        if (-not $explicitPrefix -and ($Prefix -match '\*|\+')) {
+            Write-Warning "HttpListener could not bind to '$Prefix' (may need elevation on Windows). Retrying with localhost-only binding."
+            $listener.Close()
+            $listener = [System.Net.HttpListener]::new()
+            $Prefix   = "http://localhost:$Port/"
+            $listener.Prefixes.Add($Prefix)
+            $listener.Start()   # let this throw naturally if it also fails
+        } else {
+            throw $_
+        }
     }
 
     $startTime   = [datetime]::UtcNow
@@ -217,6 +238,11 @@ function Start-StagelinQApi {
 
     $handle = $ps.BeginInvoke()
 
+    # Derive the BaseUrl that clients (browser, Invoke-RestMethod) should use.
+    # Wildcard/+ prefixes are server-side ACLs; the fetch URL must use a real host.
+    $baseUrl = $Prefix -replace '^http://(\*|\+):', 'http://localhost:'
+    $baseUrl = $baseUrl.TrimEnd('/')
+
     [PSCustomObject]@{
         Listener  = $listener
         Ps        = $ps
@@ -225,6 +251,7 @@ function Start-StagelinQApi {
         StartTime = $startTime
         Port      = $Port
         Prefix    = $Prefix
+        BaseUrl   = $baseUrl
     }
     } catch {
         # If anything failed after listener.Start(), shut it down
