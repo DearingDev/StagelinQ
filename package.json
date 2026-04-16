@@ -1,0 +1,10 @@
+{
+  "name": "stagelinq-dashboard-tests",
+  "private": true,
+  "scripts": {
+    "test:browser": "npx playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1"
+  }
+}

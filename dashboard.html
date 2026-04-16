@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StagelinQ Dashboard</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Righteous&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           #05050a;
+      --glass:        rgba(255, 255, 255, 0.03);
+      --glass-border: rgba(255, 255, 255, 0.1);
+      --c1:           #00f2ff;   /* Neon Cyan */
+      --c1-glow:      rgba(0, 242, 255, 0.3);
+      --c2:           #ff4d00;   /* Electric Orange */
+      --c2-glow:      rgba(255, 77, 0, 0.3);
+      --green:        #00ff95;
+      --yellow:       #ffcc00;
+      --text:         #f0f0f5;
+      --text-muted:   #888899;
+    }
+
+    body {
+      background: var(--bg);
+      background-image: 
+        radial-gradient(circle at 10% 20%, rgba(0, 242, 255, 0.05) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(255, 77, 0, 0.05) 0%, transparent 40%);
+      color: var(--text);
+      font-family: 'Orbitron', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+      gap: 30px;
+      overflow-x: hidden;
+    }
+
+    /* ── Header ───────────────────────────────────────────────────────── */
+    header {
+      text-align: center;
+      z-index: 10;
+    }
+
+    header h1 {
+      font-family: 'Righteous', cursive;
+      font-size: 3rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      background: linear-gradient(to bottom, #fff, #888);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 10px rgba(255,255,255,0.2));
+      margin-bottom: 10px;
+    }
+
+    .status-row {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      text-transform: uppercase;
+    }
+
+    .dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+    .dot.ok  { background: var(--green); box-shadow: 0 0 12px var(--green); }
+    .dot.err { background: #ff3344;      box-shadow: 0 0 12px #ff3344; }
+
+    /* ── Deck Layout ──────────────────────────────────────────────────── */
+    .decks {
+      display: flex;
+      gap: 24px;
+      width: 100%;
+      max-width: 1000px;
+      perspective: 1000px;
+    }
+
+    .deck {
+      flex: 1;
+      background: var(--glass);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--glass-border);
+      border-radius: 24px;
+      padding: 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .deck::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 4px;
+      opacity: 0.5;
+    }
+
+    .deck-1 { box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(0, 242, 255, 0.05); }
+    .deck-2 { box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255, 77, 0, 0.05); }
+
+    .deck-1::before { background: var(--c1); box-shadow: 0 0 15px var(--c1); }
+    .deck-2::before { background: var(--c2); box-shadow: 0 0 15px var(--c2); }
+
+    .deck-header {
+      font-family: 'Righteous', cursive;
+      font-size: 0.8rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      opacity: 0.8;
+    }
+    .deck-1 .deck-header { color: var(--c1); }
+    .deck-2 .deck-header { color: var(--c2); }
+
+    .song-name {
+      font-size: 1.4rem;
+      font-weight: 800;
+      line-height: 1.2;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .artist-name {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: 0.04em;
+      margin-top: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ── BPM ──────────────────────────────────────────────────────────── */
+    .bpm-block { 
+      margin: 10px 0;
+    }
+
+    .bpm-value {
+      font-family: 'Righteous', cursive;
+      font-size: 4.5rem;
+      line-height: 0.9;
+      margin-left: -4px;
+    }
+    .deck-1 .bpm-value { color: var(--c1); text-shadow: 0 0 20px var(--c1-glow); }
+    .deck-2 .bpm-value { color: var(--c2); text-shadow: 0 0 20px var(--c2-glow); }
+
+    .bpm-unit {
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0.3em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-top: 8px;
+    }
+
+    /* ── Beat Phase ───────────────────────────────────────────────────── */
+    .beat-wrap {
+      background: rgba(0,0,0,0.3);
+      border-radius: 100px;
+      height: 12px;
+      padding: 3px;
+      border: 1px solid var(--glass-border);
+    }
+
+    .beat-fill {
+      height: 100%;
+      border-radius: 100px;
+      width: 0%;
+      transition: width 0.1s linear;
+    }
+    .deck-1 .beat-fill { background: linear-gradient(90deg, #0088ff, var(--c1)); box-shadow: 0 0 10px var(--c1-glow); }
+    .deck-2 .beat-fill { background: linear-gradient(90deg, #ff0000, var(--c2)); box-shadow: 0 0 10px var(--c2-glow); }
+
+    /* Flash Animation */
+    @keyframes pulse-c1 { 0% { box-shadow: 0 0 0 0 rgba(0, 242, 255, 0.4); } 70% { box-shadow: 0 0 0 20px rgba(0, 242, 255, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 242, 255, 0); } }
+    @keyframes pulse-c2 { 0% { box-shadow: 0 0 0 0 rgba(255, 77, 0, 0.4); } 70% { box-shadow: 0 0 0 20px rgba(255, 77, 0, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 77, 0, 0); } }
+
+    .deck.on-beat.deck-1 { animation: pulse-c1 4.0s ease-out; border-color: var(--c1); }
+    .deck.on-beat.deck-2 { animation: pulse-c2 4.0s ease-out; border-color: var(--c2); }
+
+    /* ── Badges ───────────────────────────────────────────────────────── */
+    .badges {
+      display: flex;
+      gap: 10px;
+    }
+
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 6px 14px;
+      border-radius: 100px;
+      border: 1px solid var(--glass-border);
+      background: rgba(255,255,255,0.05);
+      transition: all 0.2s ease;
+    }
+
+    .badge.playing { color: #000; background: var(--green); border-color: var(--green); box-shadow: 0 0 15px rgba(0, 255, 149, 0.3); }
+    .badge.loop-on  { color: #000; background: var(--yellow); border-color: var(--yellow); box-shadow: 0 0 15px rgba(255, 204, 0, 0.3); }
+    .badge.stopped, .badge.loop-off { color: var(--text-muted); }
+
+    .beat-index {
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+      margin-top: auto;
+    }
+
+    /* ── Mixer ────────────────────────────────────────────────────────── */
+    .mixer {
+      width: 100%;
+      max-width: 1000px;
+      background: var(--glass);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--glass-border);
+      border-radius: 24px;
+      padding: 30px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .mixer-label {
+      font-family: 'Righteous', cursive;
+      font-size: 0.8rem;
+      letter-spacing: 0.3em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      text-align: center;
+    }
+
+    .xfader-track {
+      position: relative;
+      background: rgba(0,0,0,0.4);
+      border-radius: 100px;
+      height: 16px;
+      border: 1px solid var(--glass-border);
+    }
+
+    .xfader-thumb {
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 40px; height: 28px;
+      background: #fff;
+      border-radius: 8px;
+      transition: left 0.1s ease-out;
+      box-shadow: 0 0 20px rgba(255,255,255,0.4), 0 4px 10px rgba(0,0,0,0.5);
+      left: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .xfader-thumb::after {
+      content: '';
+      width: 2px; height: 14px;
+      background: rgba(0,0,0,0.1);
+      border-radius: 2px;
+    }
+
+    .xfader-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    .xfader-labels span:first-child { color: var(--c1); }
+    .xfader-labels span:last-child  { color: var(--c2); }
+
+    /* ── Footer ───────────────────────────────────────────────────────── */
+    footer {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-top: 10px;
+    }
+
+    /* ── Debug Panel ──────────────────────────────────────────────────── */
+    .debug-toggle {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      cursor: pointer;
+      user-select: none;
+      padding: 6px 16px;
+      border: 1px solid var(--glass-border);
+      border-radius: 100px;
+      background: rgba(255,255,255,0.03);
+      transition: all 0.2s ease;
+      margin-top: 10px;
+    }
+    .debug-toggle:hover {
+      color: var(--c1);
+      border-color: var(--c1);
+    }
+
+    .debug-panel {
+      display: none;
+      width: 100%;
+      max-width: 1000px;
+      background: var(--glass);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      padding: 20px;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 0.7rem;
+      line-height: 1.6;
+      color: var(--text-muted);
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .debug-panel.visible { display: block; }
+
+    .debug-panel .key { color: var(--c1); }
+    .debug-panel .val { color: var(--text); }
+    .debug-panel .empty-warning {
+      color: #ff4444;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      text-align: center;
+      padding: 10px;
+    }
+
+    .state-count {
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+    }
+    .state-count.empty { color: #ff4444; }
+    .state-count.ok    { color: var(--green); }
+
+    @media (max-width: 768px) {
+      .decks { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>StagelinQ</h1>
+    <div class="status-row">
+      <span>
+        <span class="dot" id="healthDot"></span>
+        <span id="healthText">CONNECTING…</span>
+      </span>
+      <span id="uptimeText"></span>
+    </div>
+  </header>
+
+  <!-- decks -->
+  <div class="decks">
+
+    <div class="deck deck-1" id="deck1">
+      <div class="deck-header">DECK 01</div>
+      <div class="song-name" id="d1-song">—</div>
+      <div class="artist-name" id="d1-artist"></div>
+      <div class="bpm-block">
+        <div class="bpm-value" id="d1-bpm">—</div>
+        <div class="bpm-unit">BPM</div>
+      </div>
+      <div class="beat-wrap">
+        <div class="beat-fill" id="d1-beat"></div>
+      </div>
+      <div class="badges">
+        <span class="badge stopped" id="d1-play">STOPPED</span>
+        <span class="badge loop-off" id="d1-loop">LOOP</span>
+      </div>
+      <div class="beat-index" id="d1-bidx"></div>
+    </div>
+
+    <div class="deck deck-2" id="deck2">
+      <div class="deck-header">DECK 02</div>
+      <div class="song-name" id="d2-song">—</div>
+      <div class="artist-name" id="d2-artist"></div>
+      <div class="bpm-block">
+        <div class="bpm-value" id="d2-bpm">—</div>
+        <div class="bpm-unit">BPM</div>
+      </div>
+      <div class="beat-wrap">
+        <div class="beat-fill" id="d2-beat"></div>
+      </div>
+      <div class="badges">
+        <span class="badge stopped" id="d2-play">STOPPED</span>
+        <span class="badge loop-off" id="d2-loop">LOOP</span>
+      </div>
+      <div class="beat-index" id="d2-bidx"></div>
+    </div>
+
+  </div>
+
+  <!-- mixer -->
+  <div class="mixer">
+    <div class="mixer-label">CROSSFADER</div>
+    <div class="xfader-track">
+      <div class="xfader-thumb" id="xfaderThumb"></div>
+    </div>
+    <div class="xfader-labels">
+      <span>◄ DECK 1</span>
+      <span style="color: var(--text-muted)">CENTER</span>
+      <span>DECK 2 ►</span>
+    </div>
+  </div>
+
+  <footer id="pollFooter">...</footer>
+  <span class="state-count" id="stateCount"></span>
+  <div class="debug-toggle" id="debugToggle" title="Show raw state keys">⚙ Debug</div>
+  <div class="debug-panel" id="debugPanel"></div>
+
+  <script>
+    // ── config ────────────────────────────────────────────────────────────────
+    const BASE     = `${window.location.protocol}//${window.location.host}`;
+    const POLL_MS  = 250;
+
+    // Update footer with current config
+    (function initFooter() {
+      try {
+        const host = new URL(BASE).host;
+        document.getElementById('pollFooter').textContent = `polling ${host} · ${POLL_MS} ms`;
+      } catch(_) {}
+    })();
+
+    // Track previous beat phase to detect beat-edge flashes
+    const prevPhase = { 1: null, 2: null };
+
+    // ── helpers ───────────────────────────────────────────────────────────────
+    function setText(id, val)  { const e = document.getElementById(id); if (e) e.textContent = val; }
+
+    function setHealth(ok, msg, uptime) {
+      const dot = document.getElementById('healthDot');
+      dot.className = 'dot ' + (ok ? 'ok' : 'err');
+      setText('healthText', msg.toUpperCase());
+      setText('uptimeText', uptime != null ? `UPTIME ${Math.floor(uptime)}S` : '');
+    }
+
+    /**
+     * Robust unwrapper for StagelinQ values. Handles:
+     * 1. Plain strings or numbers
+     * 2. Objects like { "string": "name", "type": 8 }
+     * 3. Strings containing JSON (double-encoded or raw from API)
+     */
+    function unwrap(v) {
+      if (v == null) return '';
+      
+      // If it's already a number, just return it
+      if (typeof v === 'number') return v;
+
+      // If it's already an object
+      if (typeof v === 'object') {
+        if ('string' in v) return unwrap(v.string);
+        if ('value' in v)  return unwrap(v.value);
+        if ('state' in v)  return v.state;
+        return JSON.stringify(v);
+      }
+
+      // If it's a string, try to parse as JSON
+      if (typeof v === 'string') {
+        const trimmed = v.trim();
+        if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+          try {
+            const p = JSON.parse(trimmed);
+            if (p && typeof p === 'object') return unwrap(p);
+          } catch (_) {
+            // Not valid JSON, fall through
+          }
+        }
+        return trimmed;
+      }
+      
+      return String(v);
+    }
+
+    function isTruthy(v) {
+      if (v == null) return false;
+      if (typeof v === 'boolean') return v;
+      const s = String(v).toLowerCase().trim();
+      return s === 'true' || s === '1';
+    }
+
+    function flashDeck(n) {
+      const el = document.getElementById(`deck${n}`);
+      el.classList.add('on-beat');
+      setTimeout(() => el.classList.remove('on-beat'), 4000);
+    }
+
+    // ── Client-side beat animator ─────────────────────────────────────────────
+    // When the device doesn't stream BeatInfo, we synthesize the beat phase
+    // locally using requestAnimationFrame + the BPM from StateMap.
+    const deckBeat = {
+      1: { bpm: 0, playing: false, phase: 0, hasBeatInfo: false, beatIndex: 0 },
+      2: { bpm: 0, playing: false, phase: 0, hasBeatInfo: false, beatIndex: 0 }
+    };
+    let lastAnimTime = null;
+
+    function animateBeats(timestamp) {
+      if (lastAnimTime === null) { lastAnimTime = timestamp; }
+      const dt = (timestamp - lastAnimTime) / 1000; // seconds
+      lastAnimTime = timestamp;
+
+      for (const n of [1, 2]) {
+        const d = deckBeat[n];
+        if (d.hasBeatInfo) continue; // server is providing real data
+
+        if (d.playing && d.bpm > 0) {
+          const oldPhase = d.phase;
+          d.phase += (d.bpm / 60) * dt;
+          if (d.phase >= 1.0) {
+            d.phase -= Math.floor(d.phase);
+            d.beatIndex++;
+            flashDeck(n);
+          }
+        }
+
+        // Update UI
+        const pct = (d.phase * 100).toFixed(1);
+        document.getElementById(`d${n}-beat`).style.width = pct + '%';
+        setText(`d${n}-bidx`, d.beatIndex > 0 ? `BEAT #${d.beatIndex}` : '');
+      }
+
+      requestAnimationFrame(animateBeats);
+    }
+    requestAnimationFrame(animateBeats);
+
+    // ── per-deck update ───────────────────────────────────────────────────────
+    function applyDeck(n, state) {
+      const sp  = `/Engine/Deck${n}`;
+      const bp  = `BeatInfo/Deck${n}`;
+
+      const song   = state[`${sp}/Track/SongName`];
+      const artist = state[`${sp}/Track/ArtistName`];
+      const bpm    = state[`${bp}/BPM`] ?? state[`${sp}/CurrentBPM`];
+      const phase  = state[`${bp}/Phase`];
+      const bidx   = state[`${bp}/BeatIndex`];
+      const play   = state[`${sp}/PlayState`];
+      const loop   = state[`${sp}/Loop/Active`];
+
+      const cleanSong = unwrap(song);
+      setText(`d${n}-song`, (cleanSong && cleanSong.trim()) ? cleanSong.trim() : '—');
+      const cleanArtist = unwrap(artist);
+      setText(`d${n}-artist`, (cleanArtist && cleanArtist.trim()) ? cleanArtist.trim() : '');
+      const bpmVal = parseFloat(unwrap(bpm));
+      setText(`d${n}-bpm`, (!isNaN(bpmVal) && bpmVal > 0) ? bpmVal.toFixed(1) : '—');
+
+      // Update the beat animator state
+      const playing = isTruthy(play);
+      deckBeat[n].bpm     = (!isNaN(bpmVal) && bpmVal > 0) ? bpmVal : 0;
+      deckBeat[n].playing = playing;
+
+      // If server provides BeatInfo, use it directly
+      if (phase != null) {
+        deckBeat[n].hasBeatInfo = true;
+        const pct = (parseFloat(phase) * 100).toFixed(1);
+        document.getElementById(`d${n}-beat`).style.width = pct + '%';
+
+        // detect beat edge (phase wrapped from high → low)
+        const cur = parseFloat(phase);
+        const prev = prevPhase[n];
+        if (prev !== null && cur < 0.2 && prev > 0.75) flashDeck(n);
+        prevPhase[n] = cur;
+
+        // beat index from server
+        setText(`d${n}-bidx`, bidx != null ? `BEAT #${bidx}` : '');
+      } else {
+        deckBeat[n].hasBeatInfo = false;
+        // Client-side animator handles UI updates via requestAnimationFrame
+      }
+
+      // play badge
+      const playEl  = document.getElementById(`d${n}-play`);
+      playEl.textContent = playing ? 'PLAYING' : 'STOPPED';
+      playEl.className   = 'badge ' + (playing ? 'playing' : 'stopped');
+
+      // loop badge
+      const looping  = isTruthy(loop);
+      const loopEl   = document.getElementById(`d${n}-loop`);
+      loopEl.className = 'badge ' + (looping ? 'loop-on' : 'loop-off');
+    }
+
+    // ── crossfader ────────────────────────────────────────────────────────────
+    function applyCrossfader(state) {
+      const raw = state['/Engine/Master/Crossfader/Position'];
+      if (raw == null) return;
+      // Denon range: -1 (left) to 1 (right); 0 = centre
+      const val = Math.max(-1, Math.min(1, parseFloat(raw)));
+      const pct = ((val + 1) / 2 * 100).toFixed(1);
+      document.getElementById('xfaderThumb').style.left = pct + '%';
+    }
+
+    // ── debug panel ──────────────────────────────────────────────────────────
+    document.getElementById('debugToggle').addEventListener('click', () => {
+      document.getElementById('debugPanel').classList.toggle('visible');
+    });
+
+    let lastState = {};
+
+    function updateDebugPanel(state) {
+      const panel = document.getElementById('debugPanel');
+      const countEl = document.getElementById('stateCount');
+      const keys = Object.keys(state);
+      const dataKeys = keys.filter(k => !k.startsWith('_error/'));
+      const errorKeys = keys.filter(k => k.startsWith('_error/'));
+
+      countEl.textContent = `${dataKeys.length} state key${dataKeys.length !== 1 ? 's' : ''}`;
+      countEl.className = 'state-count ' + (dataKeys.length === 0 ? 'empty' : 'ok');
+
+      if (!panel.classList.contains('visible')) return;
+
+      if (keys.length === 0) {
+        panel.innerHTML = '<div class="empty-warning">⚠ State is empty — no data received from streams.<br>'
+          + 'Check that the device is connected and streams are running.<br>'
+          + 'Try: <code>Get-StagelinQSnapshot</code> in PowerShell to verify.</div>';
+        return;
+      }
+
+      const lines = [];
+      // Show errors first in red
+      for (const k of errorKeys.sort()) {
+        lines.push(`<span style="color:#ff4444">⚠ ${k}</span> = <span style="color:#ff8888">${state[k]}</span>`);
+      }
+      // Then sorted data keys
+      for (const k of dataKeys.sort()) {
+        const v = state[k];
+        const display = typeof v === 'object' ? JSON.stringify(v) : String(v);
+        lines.push(`<span class="key">${k}</span> = <span class="val">${display}</span>`);
+      }
+      panel.innerHTML = lines.join('<br>');
+      lastState = state;
+    }
+
+    // ── poll ──────────────────────────────────────────────────────────────────
+    async function poll() {
+      try {
+        const [hRes, sRes] = await Promise.all([
+          fetch(`${BASE}/health`),
+          fetch(`${BASE}/state`)
+        ]);
+
+        if (!hRes.ok) throw new Error(`HTTP ${hRes.status}`);
+        const health = await hRes.json();
+        setHealth(true, 'CONNECTED', health.uptime);
+
+        if (sRes.ok) {
+          const state = await sRes.json();
+          applyDeck(1, state);
+          applyDeck(2, state);
+          applyCrossfader(state);
+          updateDebugPanel(state);
+        }
+      } catch (err) {
+        setHealth(false, err.message || 'UNREACHABLE', null);
+      }
+    }
+
+    poll();
+    setInterval(poll, POLL_MS);
+  </script>
+
+</body>
+</html>
