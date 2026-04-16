@@ -124,10 +124,12 @@ function Start-StagelinQStreams {
         try {
             while ($true) {
                 $frame = Read-BeatInfoValue -Connection $biConn
-                $prefix = "BeatInfo/Deck$($frame.Deck)"
-                $sharedState["$prefix/Phase"]     = $frame.BeatPhase
-                $sharedState["$prefix/BPM"]       = $frame.BPM
-                $sharedState["$prefix/BeatIndex"] = $frame.BeatIndex
+                foreach ($p in $frame.Players) {
+                    $prefix = "BeatInfo/Deck$($p.Deck)"
+                    $sharedState["$prefix/Phase"]     = $p.BeatPhase
+                    $sharedState["$prefix/BPM"]       = $p.BPM
+                    $sharedState["$prefix/BeatIndex"] = $p.BeatIndex
+                }
             }
         } catch {
             $sharedState['_error/BeatInfo'] = "Stream error: $($_.Exception.Message)"
