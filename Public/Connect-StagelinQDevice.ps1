@@ -114,9 +114,29 @@ function Connect-StagelinQDevice {
     # -----------------------------------------------------------------------
     # Background UDP keepalive runspace — sends on all subnet broadcasts
     # with the real listener port so the device knows where to connect back.
+    # Bind the UDP socket to the NIC on the device's subnet so the device
+    # consistently sees our announces from a reachable LAN source — otherwise
+    # a VPN with a lower-metric route may cause the OS to pick the VPN IP as
+    # source and the device can neither dial us back nor correlate our TCP
+    # directory connection to the announced token (resulting in an empty
+    # service list even though the TCP handshake completes).
     # -----------------------------------------------------------------------
-    $announceSocket = [System.Net.Sockets.UdpClient]::new()
+    $announceBindAddr = Get-LocalSubnetAddress -RemoteAddress $deviceFrame.SourceAddress
+    if ($announceBindAddr) {
+        $announceSocket = [System.Net.Sockets.UdpClient]::new(
+            [System.Net.IPEndPoint]::new($announceBindAddr, 0))
+    } else {
+        $announceSocket = [System.Net.Sockets.UdpClient]::new()
+    }
     $announceSocket.EnableBroadcast = $true
+
+    # Send one announce synchronously from the main thread before starting the
+    # keepalive runspace, so the device always sees at least one announce
+    # (with our real listener port) before the TCP directory handshake races
+    # in on the main thread.
+    foreach ($ep in $broadcastEndpoints) {
+        try { $announceSocket.Send($announceFrame, $announceFrame.Length, $ep) | Out-Null } catch {}
+    }
 
     $announceRunspace = [runspacefactory]::CreateRunspace()
     $announceRunspace.Open()
@@ -234,9 +254,25 @@ function Connect-StagelinQDevice {
     } else {
         $tcp = [System.Net.Sockets.TcpClient]::new()
     }
+    # Brief pause so the announce UDP we sent synchronously above has time to
+    # be processed by the device before we race in with the TCP handshake.
+    # Without this, the device sometimes returns an empty service list.
+    Start-Sleep -Milliseconds 250
     $tcp.Connect($deviceFrame.SourceAddress, $deviceFrame.ServicePort)
     $stream = $tcp.GetStream()
     $stream.ReadTimeout = 5000
+
+    # Proactively send ServicesRequest (0x00000002 + our token) + our own
+    # ServiceAnnouncement (0x00000000). Matches the Go reference — the device
+    # only sends its service list in response to a ServicesRequest. Without
+    # this, some firmware revisions never initiate and the handshake returns
+    # an empty service list even though the TCP connection is healthy.
+    $svcRequest = [byte[]]::new(20)
+    $svcRequest[3] = 0x02
+    [Array]::Copy($Token, 0, $svcRequest, 4, 16)
+    $stream.Write($svcRequest, 0, $svcRequest.Length)
+    $stream.Write($serviceAnnounceFrame, 0, $serviceAnnounceFrame.Length)
+    $stream.Flush()
 
     $services = _RunHandshake -S $stream -Tok $Token -SvcAnnounceFrame $serviceAnnounceFrame
 
