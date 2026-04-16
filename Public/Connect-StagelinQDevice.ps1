@@ -223,8 +223,17 @@ function Connect-StagelinQDevice {
 
     # -----------------------------------------------------------------------
     # Connect to the device's directory server TCP port (outbound leg).
+    # Bind to the NIC on the device's subnet when possible — otherwise a VPN
+    # with a lower-metric route (e.g. Tailscale's 192.168.0.0/16 subnet route)
+    # will capture the SYN and the connect will time out.
     # -----------------------------------------------------------------------
-    $tcp = [System.Net.Sockets.TcpClient]::new()
+    $localBindAddr = Get-LocalSubnetAddress -RemoteAddress $deviceFrame.SourceAddress
+    if ($localBindAddr) {
+        $tcp = [System.Net.Sockets.TcpClient]::new(
+            [System.Net.IPEndPoint]::new($localBindAddr, 0))
+    } else {
+        $tcp = [System.Net.Sockets.TcpClient]::new()
+    }
     $tcp.Connect($deviceFrame.SourceAddress, $deviceFrame.ServicePort)
     $stream = $tcp.GetStream()
     $stream.ReadTimeout = 5000

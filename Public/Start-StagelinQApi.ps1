@@ -52,6 +52,10 @@ function Start-StagelinQApi {
     # Default to localhost-only binding — works on Windows without elevation.
     # Wildcard bindings (http://*:Port/ or http://+:Port/) require either admin
     # privileges or a 'netsh http add urlacl' entry on Windows.
+    # HTTP.sys matches prefixes by Host header, so bind both `localhost` and
+    # `127.0.0.1` — otherwise a browser loading /dashboard from localhost but
+    # fetching /state via 127.0.0.1 (to dodge dual-stack ::1 resolution) gets
+    # HTTP 400 "Invalid Hostname".
     $explicitPrefix = [bool]$Prefix
     if (-not $Prefix) {
         $Prefix = "http://localhost:$Port/"
@@ -59,6 +63,9 @@ function Start-StagelinQApi {
 
     $listener = [System.Net.HttpListener]::new()
     $listener.Prefixes.Add($Prefix)
+    if (-not $explicitPrefix) {
+        $listener.Prefixes.Add("http://127.0.0.1:$Port/")
+    }
     try {
         $listener.Start()
     } catch {
@@ -74,6 +81,7 @@ function Start-StagelinQApi {
             $listener = [System.Net.HttpListener]::new()
             $Prefix   = "http://localhost:$Port/"
             $listener.Prefixes.Add($Prefix)
+            $listener.Prefixes.Add("http://127.0.0.1:$Port/")
             $listener.Start()   # let this throw naturally if it also fails
         } else {
             throw $_
