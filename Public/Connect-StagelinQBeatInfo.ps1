@@ -4,9 +4,12 @@ function Connect-StagelinQBeatInfo {
         Opens a TCP connection to the BeatInfo service on a StagelinQ device.
     .DESCRIPTION
         Looks up the BeatInfo service port via Get-StagelinQService, opens a
-        TCP connection to the device, and sends the connection frame (type
-        0x00000000 + token + "BeatInfo" + port 0). Returns a connection object
-        for use with Read-BeatInfoValue and Watch-StagelinQBeatInfo.
+        TCP connection to the device, and sends:
+          1. The service-open frame (type 0x00000000 + token + "BeatInfo" + port 0)
+          2. The StartStream frame (uint32 BE length=4 + uint32 BE magic=0)
+        The device will not emit BeatEmit frames until it receives StartStream;
+        matches icedream/go-stagelinq (beat_info_connection.go). Returns a
+        connection object for use with Read-BeatInfoValue and Watch-StagelinQBeatInfo.
     .PARAMETER Device
         The device connection object returned by Connect-StagelinQDevice.
     .EXAMPLE
@@ -50,6 +53,11 @@ function Connect-StagelinQBeatInfo {
     $bw.Close(); $ms.Close()
 
     $stream.Write($connectMsg, 0, $connectMsg.Length)
+    $stream.Flush()
+
+    # StartStream: uint32 BE payload_length=4, uint32 BE magic=0
+    $startStream = [byte[]]@(0,0,0,4, 0,0,0,0)
+    $stream.Write($startStream, 0, $startStream.Length)
     $stream.Flush()
 
     [PSCustomObject]@{
