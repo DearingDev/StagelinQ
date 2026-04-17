@@ -591,7 +591,7 @@
       const phase  = state[`${bp}/Phase`];
       const bidx   = state[`${bp}/BeatIndex`];
       const play   = state[`${sp}/PlayState`];
-      const loop   = state[`${sp}/Loop/Active`];
+      const loop   = state[`${sp}/Track/LoopEnableState`];
 
       const cleanSong = unwrap(song);
       setText(`d${n}-song`, (cleanSong && cleanSong.trim()) ? cleanSong.trim() : '—');
